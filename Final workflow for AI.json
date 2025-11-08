@@ -1,0 +1,272 @@
+{
+  "name": "My workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $('Webhook').item.json.body.message }}",
+        "options": {
+          "systemMessage": "=# System Prompt untuk AI Agent\n\nKonteks waktu: {{ $json.current_date }}, {{ $json.current_time }} {{ $json.timezone_name }}\n\nRole & Expertise\nAnda adalah Staf Ahli Data berpengalaman 10 tahun yang menguasai analisis database dan query optimization. Tugas utama Anda adalah memberikan informasi data yang akurat dan relevan berdasarkan pertanyaan user dengan memanfaatkan tools database yang tersedia.\n\nData Processing Principle\n- Process ALL Results: Selalu analisis SEMUA baris/data yang dikembalikan oleh query, bukan hanya item pertama\n- Comprehensive Analysis: Periksa seluruh output sebelum memberikan kesimpulan\n- Data Validation: Cross-check informasi ketika diperlukan\n\nSpecific Business Rules\n 1. Query CKPN (Collectibility Quality)\nKetika user menanyakan tentang CKPN:\n- Tabel Target: rpt_history_kol_n_ppap_kredit\n- Kolom Data: ckpn\n- Parameter Tanggal: Gunakan kolom tanggal untuk range/filter\n\n 2. Query Tabungan\nKetika user menanyakan tentang tabungan:\n- Tabel Target: adm_permohonan_tabungan \n- Kolom Nama Nasabah: nama_nasabah\n\n 3. Query Kredit\nKetika user menanyakan tentang kredit:\n- Tabel Target: adm_permohonan_kredit\n- Kolom Nama Nasabah: nama_nasabah\n- Kolom nomor rekening: nomor_register_aplikasi\n\n 4. Query deposito\nKetika user menanyakan tentang deposito:\n- Tabel Target: adm_permohonan_deposito\n- Kolom Nama Nasabah: nama_nasabah\n- Kolom nomor rekening: nomor_register\n\njika nilai tersebut adalah mata uang, awali dengan Rp.\n\nResponse Guidelines\n1. Accuracy First: Berikan data yang tepat dan terverifikasi\n2. Context Awareness: Sesuaikan respons dengan konteks pertanyaan user\n3. Tool Utilization: Manfaatkan tools database yang tersedia secara optimal\n4. Clear Explanation: Jelaskan temuan data dengan bahasa yang mudah dipahami\n5. Proactive Suggestion: Tawarkan analisis tambahan jika relevan\n\nSQL Query Guidelines\n- JANGAN biarkan WHERE kosong: Jika tidak ada condition, gunakan WHERE 1=1\n- Valid SQL: Pastikan query selalu valid syntax SQL\n- Contoh Query Saldo Terbanyak:\n  -  BENAR: SELECT nama_nasabah, saldo FROM adm_permohonan_tabungan ORDER BY saldo DESC LIMIT 1\n  - SALAH: SELECT nama_nasabah, saldo FROM adm_permohonan_tabungan WHERE ORDER BY saldo DESC LIMIT 1\n\nError Handling\n- Jika data tidak ditemukan, informasikan dengan jelas dan berikan alternatif\n- Jika terjadi ambiguity, konfirmasi detail sebelum memberikan respons\n- Jika tools tidak mengembalikan hasil yang diharapkan, laporkan dan sarankan solusi"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3,
+      "position": [
+        208,
+        0
+      ],
+      "id": "9b31757f-c6d2-4e37-b92d-2b90e7c24374",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        48,
+        240
+      ],
+      "id": "038145dd-7bcf-4e45-a6d7-6c37c7e52e39",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "D9qdWzNRQhhXNuje",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('Webhook').item.json.body.sessionId }}",
+        "contextWindowLength": 99
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        224,
+        240
+      ],
+      "id": "1143f70e-1bd4-49ec-9961-7dc980258caf",
+      "name": "Simple Memory"
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "List all availeble tables",
+        "operation": "executeQuery",
+        "query": "SELECT \n    COUNT(*) as total_tables,\n    STRING_AGG(tablename, ', ') as table_list\nFROM pg_tables \nWHERE schemaname = 'public';",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgresTool",
+      "typeVersion": 2.6,
+      "position": [
+        544,
+        240
+      ],
+      "id": "ef7d42a2-f619-420e-a09f-f75824257538",
+      "name": "List tables",
+      "credentials": {
+        "postgres": {
+          "id": "XyDwUfAHzjuMP7Wp",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Read a table schema",
+        "operation": "executeQuery",
+        "query": "SELECT JSON_AGG(\n  JSON_BUILD_OBJECT(\n    'column_name', column_name,\n    'data_type', data_type, \n    'is_nullable', is_nullable\n  )\n) as schema_info\nFROM information_schema.columns\nWHERE table_name = $1 \nAND table_schema = 'public'",
+        "options": {
+          "queryReplacement": "={{ $fromAI('tableName', 'The name of the table.') }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgresTool",
+      "typeVersion": 2.6,
+      "position": [
+        400,
+        240
+      ],
+      "id": "b2d0fbe2-1abc-44a7-ac8e-e5740903c1e6",
+      "name": "Get table schema",
+      "credentials": {
+        "postgres": {
+          "id": "XyDwUfAHzjuMP7Wp",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT {{ $fromAI ('fields', 'Fields to select') }}\nFROM {{ $fromAI('tableName', 'name of table to select') }} \nWHERE {{ $fromAI('condition', 'Condition of select')\n}}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgresTool",
+      "typeVersion": 2.6,
+      "position": [
+        688,
+        240
+      ],
+      "id": "2093a460-43d1-441b-94d8-05a340a3b9a3",
+      "name": "Execute select",
+      "credentials": {
+        "postgres": {
+          "id": "XyDwUfAHzjuMP7Wp",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get current date and time in GMT+7\nconst now = new Date();\n\n// Custom function untuk hari dan bulan dalam Bahasa Indonesia\nconst days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];\nconst months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];\n\nconst dayName = days[now.getDay()];\nconst date = now.getDate();\nconst monthName = months[now.getMonth()];\nconst year = now.getFullYear();\n\nconst currentDate = `${dayName}, ${date} ${monthName} ${year}`;\n\n// Format time for GMT+7 (WIB)\nconst timeOptions = { \n  timeZone: 'Asia/Jakarta', // Jakarta is GMT+7\n  hour: '2-digit',\n  minute: '2-digit',\n  second: '2-digit',\n  hour12: false // Use 24-hour format\n};\n\nconst currentTime = now.toLocaleTimeString('id-ID', timeOptions);\n\n// Add date context to the message\nconst userMessage = $input.first().json.message;\nconst messageWithContext = `Konteks waktu: ${currentDate} pukul ${currentTime} GMT+7\n\nPertanyaan user: ${userMessage}`;\n\nreturn {\n  message: messageWithContext,\n  original_message: userMessage,\n  current_date: currentDate,\n  current_time: currentTime,\n  day_name: dayName,\n  full_date: currentDate,\n  timestamp: now.toISOString(),\n  timezone: 'GMT+7',\n  timezone_name: 'WIB (Western Indonesia Time)'\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "f4e0805b-10b2-4a87-b301-a77ebab1d0c2",
+      "name": "Untuk dapatkan tanggal terkini"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "/chat-message",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -208,
+        0
+      ],
+      "id": "818fa15b-8ea8-40e6-953c-ef862c07860c",
+      "name": "Webhook",
+      "webhookId": "d87988e3-3f9a-4bb9-b6ce-c4c04db30574"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.output }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        560,
+        0
+      ],
+      "id": "424efd59-5718-4bbb-9cff-67c2a98531ee",
+      "name": "Respond to Webhook"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get table schema": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List tables": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute select": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Untuk dapatkan tanggal terkini": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Untuk dapatkan tanggal terkini",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "f42b0762-b32c-493f-8cac-076654d90a2c",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "1867b63218b35b3b177866425f75c9cd0217d18dee566249d3549bd0a317a4df"
+  },
+  "id": "0YdCu72sVOODPaUi",
+  "tags": []
+}
