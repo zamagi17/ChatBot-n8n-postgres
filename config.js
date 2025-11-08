@@ -6,7 +6,7 @@ const CONFIG = {
     N8N_WEBHOOK_URL: 'http://localhost:5678/webhook/chat-message',
     
     BACKEND_URL: 'http://localhost:3001/api/chat', // Sesuaikan port
-    SESSION_ID: 'toko-kopi-' + Date.now(),
+    SESSION_ID: 'ukabima-' + Date.now(),
     
     // API endpoints (adjust based on your n8n workflow)
     ENDPOINTS: {
